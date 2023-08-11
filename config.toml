@@ -3,7 +3,7 @@ author = "Alexandre Klein"
 title = "TheyCallMeHacked"
 
 # The URL the site will be built for
-base_url = "https://example.com"
+base_url = "https://theycallmehacked.github.io/"
 
 # Whether to automatically compile all Sass files in the sass directory
 compile_sass = true
