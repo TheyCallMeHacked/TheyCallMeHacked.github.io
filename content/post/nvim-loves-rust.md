@@ -1,6 +1,6 @@
 +++
 title="Nvim loves Rust: How I built a toy plug-in for neovim in Rust"
-date=2023-07-24
+date = 2023-08-11
 
 [taxonomies]
 categories = ["Programming"]
