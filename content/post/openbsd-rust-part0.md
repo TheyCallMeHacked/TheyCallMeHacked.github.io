@@ -193,6 +193,10 @@ considering that OpenBSD is only a Tier 3 target, I will not guarantee
 that this will always be possible, and it will definitively not be able
 to be my main developing environment (missing tooling etc...).
 
+EDIT: It turns out, cross compiling for OpenBSD is a pain in the arse.
+So change of plans: I will still be developing on Linux, but building
+and testing on OpenBSD.
+
 # Source code
 
 The source code of the project will be available on [my Codeberg repository](https://codeberg.org/TheyCallMeHacked/openbsd_base_rs).
