@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+    <title>TheyCallMeHacked - Programming</title>
+    <link href="https://theycallmehacked.github.io/categories/programming/atom.xml" rel="self" type="application/atom+xml"/>
+    <link href="https://theycallmehacked.github.io/"/>
+    <generator uri="https://www.getzola.org/">Zola</generator>
+    <updated>2023-09-15T00:00:00+00:00</updated>
+    <id>https://theycallmehacked.github.io/categories/programming/atom.xml</id>
+    <entry xml:lang="en">
+        <title>Rewrite it in Rust: OpenBSD base package edition - Part 0</title>
+        <published>2023-09-15T00:00:00+00:00</published>
+        <updated>2023-09-15T00:00:00+00:00</updated>
+        <author>
+          <name>Alexandre Klein</name>
+        </author>
+        <link rel="alternate" href="https://theycallmehacked.github.io/post/openbsd-rust-part0/" type="text/html"/>
+        <id>https://theycallmehacked.github.io/post/openbsd-rust-part0/</id>
+        
+        <summary type="html">&lt;p&gt;If you&#x27;ve been around the Rust community, you have probably heard the
+trope &amp;quot;rewrite it in Rust&amp;quot;. That&#x27;s what we&#x27;re gonna be doing today with
+OpenBSD&#x27;s base system package.&lt;&#x2F;p&gt;
+</summary>
+        
+    </entry>
+    <entry xml:lang="en">
+        <title>Nvim loves Rust: How I built a toy plug-in for neovim in Rust</title>
+        <published>2023-08-11T00:00:00+00:00</published>
+        <updated>2023-08-11T00:00:00+00:00</updated>
+        <author>
+          <name>Alexandre Klein</name>
+        </author>
+        <link rel="alternate" href="https://theycallmehacked.github.io/post/nvim-loves-rust/" type="text/html"/>
+        <id>https://theycallmehacked.github.io/post/nvim-loves-rust/</id>
+        
+        <summary type="html">&lt;p&gt;You most probably know that the neovim text editor can be configured and
+extended using the Lua programming language. You may also know, if you&#x27;ve read
+through the documentation, that you can also use other programming languages
+using an RPC server. But what you may not have known, is that you can also use
+any language that compiles to a dynamic library using the C ABI of your
+operating system.&lt;&#x2F;p&gt;
+</summary>
+        
+    </entry>
+</feed>

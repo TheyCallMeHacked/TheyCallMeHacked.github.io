@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+    <title>TheyCallMeHacked - Photography</title>
+    <link href="https://theycallmehacked.github.io/categories/photography/atom.xml" rel="self" type="application/atom+xml"/>
+    <link href="https://theycallmehacked.github.io/"/>
+    <generator uri="https://www.getzola.org/">Zola</generator>
+    <updated>2023-08-27T00:00:00+00:00</updated>
+    <id>https://theycallmehacked.github.io/categories/photography/atom.xml</id>
+    <entry xml:lang="en">
+        <title>Fotography on mount Esja</title>
+        <published>2023-08-27T00:00:00+00:00</published>
+        <updated>2023-08-27T00:00:00+00:00</updated>
+        <author>
+          <name>Alexandre Klein</name>
+        </author>
+        <link rel="alternate" href="https://theycallmehacked.github.io/post/esja/" type="text/html"/>
+        <id>https://theycallmehacked.github.io/post/esja/</id>
+        
+        <summary type="html">&lt;p&gt;Some of those who know me personally might know that I moved to Iceland for a
+year. And while I&#x27;m there, I might as well go hiking and photographing.&lt;&#x2F;p&gt;
+</summary>
+        
+    </entry>
+</feed>

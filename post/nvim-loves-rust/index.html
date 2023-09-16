@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  
+<title>Nvim loves Rust: How I built a toy plug-in for neovim in Rust | TheyCallMeHacked</title>
+
+  <link rel="shortcut icon" type="image/png" href="&#x2F;images&#x2F;logo.png">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link id="stylesheet" rel="stylesheet" type="text/css" href="/main.css">
+</head>
+
+<div class="header">
+  <div class="site_title">
+    <p><a href="/"><img class="icon" src="https:&#x2F;&#x2F;theycallmehacked.github.io&#x2F;&#x2F;images&#x2F;logo.png" alt="TheyCallMeHacked"
+                                                                                 width="70" height=auto ></a></p>
+    <p><a href="/">&nbsp;TheyCallMeHacked</a></p>
+  </div>
+  <div class="menu">
+    <a href="/post">archives</a>
+    &nbsp;&nbsp;<a href="/about">about</a>
+  </div>
+</div>
+
+<body onload="getTheme()">
+  <section class="section">
+    <div class="container">
+      
+<p>
+  <div class="title_postpage">Nvim loves Rust: How I built a toy plug-in for neovim in Rust</div>
+</p>
+<p>
+  <div class="date_postpage">2023-08-11</div>
+  <div class="taxonomies_postpage">
+  
+      
+      <a href="https://theycallmehacked.github.io/categories/programming/">/Programming</a>
+      
+  
+  
+      
+      &emsp;<a href="https://theycallmehacked.github.io/tags/rust/">#rust</a>
+      
+      &emsp;<a href="https://theycallmehacked.github.io/tags/neovim/">#neovim</a>
+      
+      &emsp;<a href="https://theycallmehacked.github.io/tags/ffi/">#FFI</a>
+      
+  
+  </div>
+</p>
+
+<p>
+  <p>You most probably know that the neovim text editor can be configured and
+extended using the Lua programming language. You may also know, if you've read
+through the documentation, that you can also use other programming languages
+using an RPC server. But what you may not have known, is that you can also use
+any language that compiles to a dynamic library using the C ABI of your
+operating system.</p>
+<span id="continue-reading"></span><h1 id="the-idea">The Idea</h1>
+<p>If you've spent any amount of time playing around in neovim, you've definitely
+come across Lua as a programming language. You may have heard that Lua is a
+language designed to allow more or less easy interoperability with C. This
+allows us to write with any language that can be compiled to a <code>.so</code> or <code>.dll</code>.
+My choice of language was Rust, as there are already some handy tools that work
+for this.</p>
+<p>In order to have it work, we just need to compile a Rust library to a C dynamic
+library, put it in the <code>lua</code> folder of our plug-in, and we should be good to go!</p>
+<h1 id="the-project">The Project</h1>
+<p>A wise man once told me, &quot;If it's useless, it's absolutely necessary&quot;.
+Following this precept, we will build the most necessary neovim plug-in out
+there: a morse interpreter. This is a good reason to use Rust, as there is no
+good cross-platform audio library for lua, that doesn't require LuaRocks.</p>
+<h2 id="cargo-setup">Cargo setup</h2>
+<p>In order to be able to communicate with neovim, Rust will need to do two
+things:</p>
+<ol>
+<li>Understand Lua</li>
+<li>Learn the neovim API</li>
+</ol>
+<p>We could definitely use a crate like <a href="https://lib.rs/crates/mlua"><code>mlua</code></a> and
+write our own wrappers for that, but it would be tedious. Luckily, somebody
+else already did all the heavy lifting and wrote
+<a href="https://lib.rs/crates/nvim-oxi"><code>nvim-oxi</code></a>, which we will use here. We will also
+use <a href="https://lib.rs/crates/rodio"><code>rodio</code></a> for the audio processing, to play our files
+as morse beeps. Our <code>Cargo.toml</code> thus looks like this:</p>
+<pre data-lang="toml" style="background-color:#2b303b;color:#c0c5ce;" class="language-toml "><code class="language-toml" data-lang="toml"><span>[package]
+</span><span style="color:#bf616a;">name </span><span>= &quot;</span><span style="color:#a3be8c;">morse</span><span>&quot;
+</span><span style="color:#bf616a;">version </span><span>= &quot;</span><span style="color:#a3be8c;">0.1.0</span><span>&quot;
+</span><span style="color:#bf616a;">edition </span><span>= &quot;</span><span style="color:#a3be8c;">2021</span><span>&quot;
+</span><span>
+</span><span>[lib]
+</span><span style="color:#bf616a;">crate-type </span><span>= [&quot;</span><span style="color:#a3be8c;">cdylib</span><span>&quot;]
+</span><span>
+</span><span>[dependencies]
+</span><span style="color:#bf616a;">nvim-oxi </span><span>= { </span><span style="color:#bf616a;">version </span><span>= &quot;</span><span style="color:#a3be8c;">0.3.0</span><span>&quot;, </span><span style="color:#bf616a;">features </span><span>= [&quot;</span><span style="color:#a3be8c;">neovim-0-9</span><span>&quot;] }
+</span><span style="color:#bf616a;">rodio </span><span>= &quot;</span><span style="color:#a3be8c;">0.17.1</span><span>&quot;
+</span></code></pre>
+<h2 id="connecting-to-neovim-through-rust">Connecting to neovim through Rust</h2>
+<p>Using <code>nvim-oxi</code>, our lib entry point will need some special care. First, obviously,
+it must be called the same as our plug-in. But it also needs to be flagged to the
+compiler that it's a neovim module. Following the classical
+the-plug-in-is-hidden-behind-a-setup-function approach, our entry point could look like this:</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">use </span><span>nvim_oxi::{</span><span style="color:#bf616a;">self </span><span>as oxi, api::Buffer, Object, Dictionary, Function};
+</span></code></pre>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span>#[</span><span style="color:#bf616a;">oxi</span><span>::</span><span style="color:#bf616a;">module</span><span>]
+</span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">morse</span><span>() -&gt; oxi::Result&lt;Dictionary&gt; {
+</span><span>    Ok(Dictionary::from_iter([
+</span><span>        (&quot;</span><span style="color:#a3be8c;">setup</span><span>&quot;, Function::from_fn(setup)),
+</span><span>    ]))
+</span><span>}
+</span></code></pre>
+<p>The <code>Function</code> struct allows for easy conversion between Rust functions and functions
+that Lua can see.</p>
+<p>We will need a struct to hold the configuration info, which our <code>setup</code> function shall
+set. For now this struct will only hold the frequency of our beeps:</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span>#[</span><span style="color:#bf616a;">derive</span><span>(Clone, Copy)]
+</span><span style="color:#b48ead;">struct </span><span>Config {
+</span><span>    </span><span style="color:#bf616a;">freq</span><span>: </span><span style="color:#b48ead;">f32</span><span>,
+</span><span>}
+</span><span>
+</span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">setup</span><span>(</span><span style="color:#bf616a;">freq</span><span>: </span><span style="color:#b48ead;">f32</span><span>) -&gt; oxi::Result&lt;Dictionary&gt;  {
+</span><span>    </span><span style="color:#b48ead;">let</span><span> conf = Config{
+</span><span>        freq,
+</span><span>    };
+</span><span>
+</span><span>    Ok(Dictionary::from_iter([
+</span><span>        (&quot;</span><span style="color:#a3be8c;">beep</span><span>&quot;, Object::from(Function::from_fn(</span><span style="color:#b48ead;">move </span><span>|t| {</span><span style="color:#96b5b4;">beep</span><span>(t,conf)}))),
+</span><span>        (&quot;</span><span style="color:#a3be8c;">convert</span><span>&quot;, Object::from(Function::from_fn(</span><span style="color:#b48ead;">move </span><span>|b| {</span><span style="color:#96b5b4;">convert</span><span>(b,conf)}))),
+</span><span>    ]))
+</span><span>}
+</span></code></pre>
+<p>We move a copy of this config into closures owned by the <code>Function</code> objects returned
+by our config. This may not be the most efficient way to do things, but it's the
+memory-safest way I could think of, without needing runtime initialised static variables.</p>
+<h2 id="playing-audio">Playing Audio</h2>
+<p>As said above, we will use the <code>rodio</code> crate to hear our dits and dahs. To make a simple
+sine beep:</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">use </span><span>rodio::{
+</span><span>    source::{SineWave, Source},
+</span><span>    OutputStream,
+</span><span>    Sink
+</span><span>};
+</span><span style="color:#b48ead;">use </span><span>std::{
+</span><span>    time::Duration,
+</span><span>    thread::sleep,
+</span><span>    convert::Infallible
+</span><span>};
+</span></code></pre>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">beep</span><span>(</span><span style="color:#bf616a;">time</span><span>: </span><span style="color:#b48ead;">f32</span><span>, </span><span style="color:#bf616a;">conf</span><span>: Config) -&gt; Result&lt;(),Infallible&gt; {
+</span><span>    </span><span style="color:#b48ead;">let </span><span>(_stream, stream_handle) = OutputStream::try_default().</span><span style="color:#96b5b4;">unwrap</span><span>();
+</span><span>    </span><span style="color:#b48ead;">let</span><span> sink = Sink::try_new(&amp;stream_handle).</span><span style="color:#96b5b4;">unwrap</span><span>();
+</span><span>    </span><span style="color:#b48ead;">let</span><span> sine = SineWave::new(conf.freq).</span><span style="color:#96b5b4;">take_duration</span><span>(Duration::from_secs_f32(time));
+</span><span>    sink.</span><span style="color:#96b5b4;">append</span><span>(sine);
+</span><span>    sink.</span><span style="color:#96b5b4;">sleep_until_end</span><span>();
+</span><span>    Ok(())
+</span><span>}
+</span></code></pre>
+<p>Note <code>nvim_oxi::Function</code> expects a <code>Result</code> return type, which we set to <code>Infallible</code>.
+We generate an output stream to which we append a sine wave signal as long as the duration
+we give the function. Because <code>rodio</code>'s playback is asynchronous, we have to sleep until
+the audio thread signals us it's done playing.</p>
+<h2 id="bringing-it-all-together">Bringing it all together</h2>
+<p>Finally, we convert a buffer into dits and dahs. The function is all but efficient, and
+has been written this way to increase code readability:</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">convert</span><span>(</span><span style="color:#bf616a;">buf</span><span>: Buffer, </span><span style="color:#bf616a;">conf</span><span>: Config) -&gt; Result&lt;(),Infallible&gt; {
+</span><span>    </span><span style="color:#b48ead;">let mut</span><span> text: String = buf.</span><span style="color:#96b5b4;">get_lines</span><span>(.., </span><span style="color:#d08770;">false</span><span>).</span><span style="color:#96b5b4;">unwrap</span><span>().</span><span style="color:#96b5b4;">fold</span><span>(String::new(), |</span><span style="color:#bf616a;">a</span><span>,</span><span style="color:#bf616a;">s</span><span>| {a + &amp;s.</span><span style="color:#96b5b4;">to_string_lossy</span><span>() + &quot;</span><span style="color:#96b5b4;">\n</span><span>&quot;});
+</span><span>    text.</span><span style="color:#96b5b4;">pop</span><span>();
+</span><span>    </span><span style="color:#b48ead;">let</span><span> text = text.</span><span style="color:#96b5b4;">chars</span><span>().</span><span style="color:#96b5b4;">map</span><span>(|</span><span style="color:#bf616a;">c</span><span>| { </span><span style="color:#b48ead;">match</span><span> c {
+</span><span>        &#39;</span><span style="color:#a3be8c;">a</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">A</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">b</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">B</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-... </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">c</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">C</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-.-. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">d</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">D</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-.. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">e</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">E</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">f</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">F</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">..-. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">g</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">G</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">--. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">h</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">H</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.... </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">i</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">I</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">j</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">J</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.--- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">k</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">K</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-.- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">l</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">L</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.-.. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">m</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">M</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">n</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">N</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">o</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">O</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">--- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">p</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">P</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.--. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">q</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">Q</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">--.- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">r</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">R</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.-. </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">s</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">S</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">... </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">t</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">T</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">u</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">U</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">..- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">v</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">V</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">...- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">w</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">W</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">.-- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">x</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">X</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-..- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">y</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">Y</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">-.-- </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#a3be8c;">z</span><span>&#39; | &#39;</span><span style="color:#a3be8c;">Z</span><span>&#39; =&gt; &quot;</span><span style="color:#a3be8c;">--.. </span><span>&quot;,
+</span><span>        &#39; &#39;       =&gt; &quot;</span><span style="color:#a3be8c;">/ </span><span>&quot;,
+</span><span>        &#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;      =&gt; &quot;</span><span style="color:#a3be8c;">-...- </span><span>&quot;,
+</span><span>        _         =&gt; &quot;&quot;
+</span><span>    }}).</span><span style="color:#96b5b4;">fold</span><span>(String::new(), |</span><span style="color:#bf616a;">a</span><span>,</span><span style="color:#bf616a;">s</span><span>| {a + s });
+</span><span>    </span><span style="color:#b48ead;">for</span><span> s in text.</span><span style="color:#96b5b4;">chars</span><span>() {
+</span><span>        </span><span style="color:#b48ead;">let</span><span> unit = </span><span style="color:#d08770;">0.07</span><span>;
+</span><span>        </span><span style="color:#b48ead;">match</span><span> s {
+</span><span>            &#39;</span><span style="color:#a3be8c;">.</span><span>&#39; =&gt; {</span><span style="color:#96b5b4;">beep</span><span>(unit, conf).</span><span style="color:#96b5b4;">unwrap</span><span>(); </span><span style="color:#96b5b4;">sleep</span><span>(Duration::from_secs_f32(unit));},
+</span><span>            &#39;</span><span style="color:#a3be8c;">-</span><span>&#39; =&gt; {</span><span style="color:#96b5b4;">beep</span><span>(unit*</span><span style="color:#d08770;">3.0</span><span>, conf).</span><span style="color:#96b5b4;">unwrap</span><span>(); </span><span style="color:#96b5b4;">sleep</span><span>(Duration::from_secs_f32(unit));},
+</span><span>            &#39;</span><span style="color:#a3be8c;">/</span><span>&#39; =&gt; {</span><span style="color:#96b5b4;">sleep</span><span>(Duration::from_secs_f32(unit*</span><span style="color:#d08770;">2.0</span><span>));},
+</span><span>            &#39; &#39; =&gt; {</span><span style="color:#96b5b4;">sleep</span><span>(Duration::from_secs_f32(unit));},
+</span><span>            _   =&gt; {},
+</span><span>        }
+</span><span>    }
+</span><span>    Ok(())
+</span><span>}
+</span></code></pre>
+<p>We first read the lines of the buffer and concatenate them. We then convert it to a 
+string of dots and dashes and convert those dots and dashes into beeps of the appropriate
+duration. For now, the unit duration is hard-coded, but I intend to set it as a setup option.</p>
+<p>And that's all for now. To review the entire code, and try it out for yourself, go see
+<a href="https://github.com/TheyCallMeHacked/morse.nvim">the project's github page</a></p>
+<h1 id="conclusion">Conclusion</h1>
+<p>As you can see, Using neovim in conjunction with Rust as a lua replacement is really
+not that hard. There are a few abstractions lua forces us into, but it's only a matter of following
+neovim's API through <code>nvim-oxi</code> function calls.</p>
+
+  <hr class="hr_bottom"/>
+</p>
+
+
+
+
+    </div>
+  </section>
+</body>
+
+<div class="footer">
+  <a href="/">TheyCallMeHacked</a>&emsp;&copy; Alexandre Klein<br>
+  powered by <a href="https://www.getzola.org/">Zola</a>, theme <a
+    href="https://github.com/kyoheiu/emily_zola_theme">emily</a>.
+</div>
+
+</html>

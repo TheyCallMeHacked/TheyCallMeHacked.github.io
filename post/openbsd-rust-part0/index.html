@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  
+<title>Rewrite it in Rust: OpenBSD base package edition - Part 0 | TheyCallMeHacked</title>
+
+  <link rel="shortcut icon" type="image/png" href="&#x2F;images&#x2F;logo.png">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link id="stylesheet" rel="stylesheet" type="text/css" href="/main.css">
+</head>
+
+<div class="header">
+  <div class="site_title">
+    <p><a href="/"><img class="icon" src="https:&#x2F;&#x2F;theycallmehacked.github.io&#x2F;&#x2F;images&#x2F;logo.png" alt="TheyCallMeHacked"
+                                                                                 width="70" height=auto ></a></p>
+    <p><a href="/">&nbsp;TheyCallMeHacked</a></p>
+  </div>
+  <div class="menu">
+    <a href="/post">archives</a>
+    &nbsp;&nbsp;<a href="/about">about</a>
+  </div>
+</div>
+
+<body onload="getTheme()">
+  <section class="section">
+    <div class="container">
+      
+<p>
+  <div class="title_postpage">Rewrite it in Rust: OpenBSD base package edition - Part 0</div>
+</p>
+<p>
+  <div class="date_postpage">2023-09-15</div>
+  <div class="taxonomies_postpage">
+  
+      
+      <a href="https://theycallmehacked.github.io/categories/programming/">/Programming</a>
+      
+  
+  
+      
+      &emsp;<a href="https://theycallmehacked.github.io/tags/rust/">#rust</a>
+      
+      &emsp;<a href="https://theycallmehacked.github.io/tags/openbsd/">#openbsd</a>
+      
+  
+  </div>
+</p>
+
+<p>
+  <p>If you've been around the Rust community, you have probably heard the
+trope &quot;rewrite it in Rust&quot;. That's what we're gonna be doing today with
+OpenBSD's base system package.</p>
+<span id="continue-reading"></span><h1 id="notice">Notice:</h1>
+<p>Just a note before we start: I am affiliated in no way with either the
+OpenBSD nor the Rust Projects or Foundations. I'm just a student who
+wants to have fun. Especially, don't harass OpenBSD developers to
+include any of my code: It's trash and they probably wont want to
+include it anyway (see Theo de Raadt's <a href="https://marc.info/?l=openbsd-misc&amp;m=151233345723889&amp;w=2">view on Rust</a>).</p>
+<p>This isn't a fork of OpenBSD either, but simply a way for me to toy
+around. Again, please treat everyone with respect.</p>
+<h1 id="motivation">Motivation</h1>
+<p>My motivations are simple and mainly twofold:</p>
+<ol>
+<li>Learn Rust</li>
+<li>Learn OpenBSD</li>
+</ol>
+<p>That's it. Now to get a bit more into the details: I want to get better
+at Rust. I have been fully convinced, that Rust, while far from a
+perfect language, is the direction modern Programming should go. And
+while I believe its &quot;no breaking changes&quot; policy is doomed to make it a
+bloated mess in about as much time as it took C++ to become said bloated
+mess, I still think Rust is a language to take inspiration from. And
+therefore I want to deepen my experience with Rust's paradigm. And I
+want to better understand OpenBSD. Why OpenBSD? Because GNU has become
+too complex for little me to handle, BusyBox is a single executable
+making it harder to convert piece by piece, and I simply love the idea
+of the OpenBSD project. My long term goal would be to maybe contribute
+to OpenBSD, but I would first like to familiarise myself with its code
+base. And what better way to do it than to rewrite it in an other
+language. Hell I might discover bugs this way, that I may report
+upstream (unlikely considering I barely understand what an allocator is
+and does).</p>
+<p>Also note I will probably only &quot;maintain&quot; (if at all) the amd64 version.
+It may or may not be possible to build any part of what I'm doing on
+other architectures, especially i386, but I will neither guarantee nor
+even test it.</p>
+<h1 id="objectives">Objectives</h1>
+<p>The main goal of this endeavour is to have functional clones of at least
+some of the binaries in OpenBSD's base package. Considering that it
+contains 775 executables (not counting shared libraries) as of writing
+this, I can obviously not rewrite every single one of them. I will try
+my best efforts to clone the most useful ones first.</p>
+<p>Note I know the existence of <a href="https://lib.rs/crates/coreutils">uutils coreutils</a>
+but</p>
+<ol>
+<li>they implement the GNU coreutils, not OpenBSD base system</li>
+<li>I still want to build my own thing out of fun.</li>
+</ol>
+<p>As for a road map, let's try to follow this:</p>
+<ul>
+<li><input disabled="" type="checkbox"/>
+rebuild all of <code>/bin</code> except <code>sh</code>, <code>csh</code> and (<code>r</code>)<code>ksh</code>
+<ul>
+<li><input disabled="" type="checkbox"/>
+[</li>
+<li><input disabled="" type="checkbox"/>
+cat</li>
+<li><input disabled="" type="checkbox"/>
+chgrp</li>
+<li><input disabled="" type="checkbox"/>
+chio</li>
+<li><input disabled="" type="checkbox"/>
+chmod</li>
+<li><input disabled="" type="checkbox"/>
+cksum</li>
+<li><input disabled="" type="checkbox"/>
+cp</li>
+<li><input disabled="" type="checkbox"/>
+cpio</li>
+<li><input disabled="" type="checkbox"/>
+csh</li>
+<li><input disabled="" type="checkbox"/>
+date</li>
+<li><input disabled="" type="checkbox"/>
+dd</li>
+<li><input disabled="" type="checkbox"/>
+df</li>
+<li><input disabled="" type="checkbox"/>
+domainname</li>
+<li><input disabled="" type="checkbox"/>
+echo</li>
+<li><input disabled="" type="checkbox"/>
+ed</li>
+<li><input disabled="" type="checkbox"/>
+eject</li>
+<li><input disabled="" type="checkbox"/>
+expr</li>
+<li><input disabled="" type="checkbox"/>
+hostname</li>
+<li><input disabled="" type="checkbox"/>
+kill</li>
+<li><input disabled="" type="checkbox"/>
+ln</li>
+<li><input disabled="" type="checkbox"/>
+ls</li>
+<li><input disabled="" type="checkbox"/>
+md5</li>
+<li><input disabled="" type="checkbox"/>
+mkdir</li>
+<li><input disabled="" type="checkbox"/>
+mt</li>
+<li><input disabled="" type="checkbox"/>
+mv</li>
+<li><input disabled="" type="checkbox"/>
+pax</li>
+<li><input disabled="" type="checkbox"/>
+ps</li>
+<li><input disabled="" type="checkbox"/>
+pwd</li>
+<li><input disabled="" type="checkbox"/>
+rm</li>
+<li><input disabled="" type="checkbox"/>
+rmdir</li>
+<li><input disabled="" type="checkbox"/>
+sha1</li>
+<li><input disabled="" type="checkbox"/>
+sha256</li>
+<li><input disabled="" type="checkbox"/>
+sha512</li>
+<li><input disabled="" type="checkbox"/>
+sleep</li>
+<li><input disabled="" type="checkbox"/>
+stty</li>
+<li><input disabled="" type="checkbox"/>
+sync</li>
+<li><input disabled="" type="checkbox"/>
+tar</li>
+<li><input disabled="" type="checkbox"/>
+test</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"/>
+rebuild all of <code>/sbin</code>
+<ul>
+<li><input disabled="" type="checkbox"/>
+atactl</li>
+<li><input disabled="" type="checkbox"/>
+badsect</li>
+<li><input disabled="" type="checkbox"/>
+bioctl</li>
+<li><input disabled="" type="checkbox"/>
+chown</li>
+<li><input disabled="" type="checkbox"/>
+clri</li>
+<li><input disabled="" type="checkbox"/>
+dhclient</li>
+<li><input disabled="" type="checkbox"/>
+dhcpleased</li>
+<li><input disabled="" type="checkbox"/>
+disklabel</li>
+<li><input disabled="" type="checkbox"/>
+dmesg</li>
+<li><input disabled="" type="checkbox"/>
+dump</li>
+<li><input disabled="" type="checkbox"/>
+dumpfs</li>
+<li><input disabled="" type="checkbox"/>
+fdisk</li>
+<li><input disabled="" type="checkbox"/>
+fsck</li>
+<li><input disabled="" type="checkbox"/>
+fsck_ext2fs</li>
+<li><input disabled="" type="checkbox"/>
+fsck_ffs</li>
+<li><input disabled="" type="checkbox"/>
+fsck_msdos</li>
+<li><input disabled="" type="checkbox"/>
+fsdb</li>
+<li><input disabled="" type="checkbox"/>
+fsirand</li>
+<li><input disabled="" type="checkbox"/>
+growfs</li>
+<li><input disabled="" type="checkbox"/>
+halt</li>
+<li><input disabled="" type="checkbox"/>
+ifconfig</li>
+<li><input disabled="" type="checkbox"/>
+iked</li>
+<li><input disabled="" type="checkbox"/>
+init</li>
+<li><input disabled="" type="checkbox"/>
+ipsecctl</li>
+<li><input disabled="" type="checkbox"/>
+isakmpd</li>
+<li><input disabled="" type="checkbox"/>
+kbd</li>
+<li><input disabled="" type="checkbox"/>
+ldattach</li>
+<li><input disabled="" type="checkbox"/>
+ldconfig</li>
+<li><input disabled="" type="checkbox"/>
+mkfifo</li>
+<li><input disabled="" type="checkbox"/>
+mknod</li>
+<li><input disabled="" type="checkbox"/>
+mount</li>
+<li><input disabled="" type="checkbox"/>
+mount_cd9660</li>
+<li><input disabled="" type="checkbox"/>
+mountd</li>
+<li><input disabled="" type="checkbox"/>
+mount_ext2fs</li>
+<li><input disabled="" type="checkbox"/>
+mount_ffs</li>
+<li><input disabled="" type="checkbox"/>
+mount_mfs</li>
+<li><input disabled="" type="checkbox"/>
+mount_msdos</li>
+<li><input disabled="" type="checkbox"/>
+mount_nfs</li>
+<li><input disabled="" type="checkbox"/>
+mount_ntfs</li>
+<li><input disabled="" type="checkbox"/>
+mount_tmpfs</li>
+<li><input disabled="" type="checkbox"/>
+mount_udf</li>
+<li><input disabled="" type="checkbox"/>
+mount_vnd</li>
+<li><input disabled="" type="checkbox"/>
+ncheck</li>
+<li><input disabled="" type="checkbox"/>
+ncheck_ffs</li>
+<li><input disabled="" type="checkbox"/>
+newfs</li>
+<li><input disabled="" type="checkbox"/>
+newfs_ext2fs</li>
+<li><input disabled="" type="checkbox"/>
+newfs_msdos</li>
+<li><input disabled="" type="checkbox"/>
+nfsd</li>
+<li><input disabled="" type="checkbox"/>
+nologin</li>
+<li><input disabled="" type="checkbox"/>
+pfctl</li>
+<li><input disabled="" type="checkbox"/>
+pflogd</li>
+<li><input disabled="" type="checkbox"/>
+ping</li>
+<li><input disabled="" type="checkbox"/>
+ping6</li>
+<li><input disabled="" type="checkbox"/>
+quotacheck</li>
+<li><input disabled="" type="checkbox"/>
+rdump</li>
+<li><input disabled="" type="checkbox"/>
+reboot</li>
+<li><input disabled="" type="checkbox"/>
+resolvd</li>
+<li><input disabled="" type="checkbox"/>
+restore</li>
+<li><input disabled="" type="checkbox"/>
+route</li>
+<li><input disabled="" type="checkbox"/>
+rrestore</li>
+<li><input disabled="" type="checkbox"/>
+savecore</li>
+<li><input disabled="" type="checkbox"/>
+scan_ffs</li>
+<li><input disabled="" type="checkbox"/>
+scsi</li>
+<li><input disabled="" type="checkbox"/>
+shutdown</li>
+<li><input disabled="" type="checkbox"/>
+slaacd</li>
+<li><input disabled="" type="checkbox"/>
+swapctl</li>
+<li><input disabled="" type="checkbox"/>
+swapon</li>
+<li><input disabled="" type="checkbox"/>
+sysctl</li>
+<li><input disabled="" type="checkbox"/>
+ttyflags</li>
+<li><input disabled="" type="checkbox"/>
+tunefs</li>
+<li><input disabled="" type="checkbox"/>
+umount</li>
+<li><input disabled="" type="checkbox"/>
+unwind</li>
+<li><input disabled="" type="checkbox"/>
+vnconfig</li>
+<li><input disabled="" type="checkbox"/>
+wsconsctl
+This road map will be update as I progress in my endeavour. Some of
+these programs are pretty large, so I may decide to remove some from
+this list as the project progresses. </li>
+</ul>
+</li>
+</ul>
+<h1 id="development-environment">Development environment</h1>
+<p>I will developing this on (GNU/)Linux on an x86_64 machine. I will try
+to test building it with OpenBSD's port of the Rust toolchain, but
+considering that OpenBSD is only a Tier 3 target, I will not guarantee
+that this will always be possible, and it will definitively not be able
+to be my main developing environment (missing tooling etc...).</p>
+<p>EDIT: It turns out, cross compiling for OpenBSD is a pain in the arse.
+So change of plans: I will still be developing on Linux, but building
+and testing on OpenBSD.</p>
+<h1 id="source-code">Source code</h1>
+<p>The source code of the project will be available on <a href="https://codeberg.org/TheyCallMeHacked/openbsd_base_rs">my Codeberg repository</a>.</p>
+<h1 id="note-on-contributions">Note on contributions</h1>
+<p>I welcome bug reports and bug corrections, but will not accept full
+implementations. Considering that I do this to learn, it would
+completely defeat the purpose of the project to accept implementation
+submissions.</p>
+<h1 id="what-s-next">What's next?</h1>
+<p>In the next part, I will be writing <code>cat</code></p>
+
+  <hr class="hr_bottom"/>
+</p>
+
+
+
+
+    </div>
+  </section>
+</body>
+
+<div class="footer">
+  <a href="/">TheyCallMeHacked</a>&emsp;&copy; Alexandre Klein<br>
+  powered by <a href="https://www.getzola.org/">Zola</a>, theme <a
+    href="https://github.com/kyoheiu/emily_zola_theme">emily</a>.
+</div>
+
+</html>
